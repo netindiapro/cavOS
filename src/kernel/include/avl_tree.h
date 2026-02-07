@@ -21,4 +21,7 @@ avlval AVLLookup(void *root, avlkey key);
 void *AVLAllocate(void **AVLfirstPtr, avlkey key, avlval value);
 bool  AVLUnregister(void **AVLfirstPtr, avlkey key);
 
+void AVLTraverse(void *raw, void(callback)(AVLheader *data, void *ctx),
+                 void *ctx);
+
 #endif

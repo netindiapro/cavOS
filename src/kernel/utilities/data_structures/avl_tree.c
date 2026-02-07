@@ -216,3 +216,14 @@ avlval AVLLookup(void *raw, avlkey key) {
     return AVLLookup(root->left, key);
   return root->value;
 }
+
+void AVLTraverse(void *raw, void(callback)(AVLheader *data, void *ctx),
+                 void *ctx) {
+  AVLheader *root = raw;
+  if (root == NULL)
+    return;
+
+  AVLTraverse(root->left, callback, ctx);
+  callback(root, ctx);
+  AVLTraverse(root->right, callback, ctx);
+}
