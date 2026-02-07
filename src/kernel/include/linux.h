@@ -1032,6 +1032,7 @@ struct fb_fix_screeninfo {
 #define POLLERR 0x0008
 #define POLLHUP 0x0010
 #define POLLNVAL 0x0020
+#define POLLRDNORM 0x0040
 typedef unsigned int nfds_t;
 struct pollfd {
   int   fd;      /* file descriptor */

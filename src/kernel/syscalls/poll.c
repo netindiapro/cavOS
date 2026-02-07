@@ -496,6 +496,8 @@ size_t poll(struct pollfd *fds, int nfds, int timeout) {
     spinlockAcquire(&LOCK_POLL_ROOT);
     for (int i = 0; i < nfds; i++) {
       fds[i].revents = 0; // zero it out first
+      if (fds[i].fd < 0)
+        continue;
       OpenFile *fd = fsUserGetNode(currentTask, fds[i].fd);
       if (!fd)
         continue;
@@ -514,6 +516,8 @@ size_t poll(struct pollfd *fds, int nfds, int timeout) {
       assert(fd->handlers->reportKey && fd->handlers->reportKey(fd));
       int revents = epollToPollComp(
           fd->handlers->internalPoll(fd, pollToEpollComp(fds[i].events)));
+      if (revents & POLLIN && fds[i].events & POLLRDNORM)
+        fds[i].events |= POLLRDNORM;
       if (revents != 0) {
         fds[i].revents = revents;
         ret++;
@@ -604,6 +608,20 @@ force_inline struct pollfd *selectAdd(struct pollfd **comp, size_t *compIndex,
   return &(*comp)[(*compIndex)++];
 }
 
+void selectRemainingTime(struct timeval *timeout, size_t elapsed_ms) {
+  if (!timeout)
+    return;
+
+  size_t timeout_ms =
+      timeout->tv_sec * 1000 + DivRoundUp(timeout->tv_usec, 1000);
+
+  size_t remaining_ms =
+      (elapsed_ms >= timeout_ms) ? 0 : timeout_ms - elapsed_ms;
+
+  timeout->tv_sec = remaining_ms / 1000;
+  timeout->tv_usec = (remaining_ms % 1000) * 1000;
+}
+
 size_t select(int nfds, uint8_t *read, uint8_t *write, uint8_t *except,
               struct timeval *timeout) {
   size_t         compLength = sizeof(struct pollfd);
@@ -636,10 +654,15 @@ size_t select(int nfds, uint8_t *read, uint8_t *write, uint8_t *except,
   if (except)
     memset(except, 0, toZero);
 
+  size_t start = timerTicks;
   size_t res = poll(
       comp, compIndex,
       timeout ? (timeout->tv_sec * 1000 + DivRoundUp(timeout->tv_usec, 1000))
               : -1);
+  size_t time = timerTicks - start;
+  if (timeout)
+    selectRemainingTime(timeout, time);
+
   if (RET_IS_ERR(res)) {
     free(comp);
     return res;
